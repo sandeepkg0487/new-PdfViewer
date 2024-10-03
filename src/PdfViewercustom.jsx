@@ -355,9 +355,7 @@ const PdfViewer = () => {
 					</div>
 				</div>
 
-				{/* {is_loadingCanvas && <div className="position-absolute top-0 end-0">
-					<div class=" spinner-border text-primary" role="status"></div>
-				</div>} */}
+				
 
 			</div>
 		</>
