@@ -2,9 +2,9 @@ import * as pdfjs from "pdfjs-dist";
 import "pdfjs-dist/web/pdf_viewer.css";
 import { useCallback } from "react";
 import { useEffect, useRef, useState } from "react";
-import URI from "./assets/sample12.pdf"
+// import URI from "./assets/sample12.pdf"
 
-
+const URI = 'https://api24.ilovepdf.com/v1/download/lbr3wzz5ynw4zldpq6jgt8t4t06h97tcyncy7m1ylpql633hddrfq24w46h62jslq92fk7vgx65qb0npmflmy00jzmpkznlb5y81n9zq8rxfpAm9bAdr4vsljzmhb1xww9ws4yv5lblfrmcxg3qqn6433AyxntA2wksmc67ld5Awp6p9v8t1'
 // pdfjs.GlobalWorkerOptions.workerSrc = new URL("pdfjs-dist/build/pdf.worker.min.mjs", import.meta.url).toString();
 pdfjs.GlobalWorkerOptions.workerSrc = new URL("pdfjs-dist/build/pdf.worker.min.mjs", import.meta.url).toString();
 
@@ -21,8 +21,13 @@ const PdfViewer = () => {
 	const [pdf, setPdf] = useState(null)
 	const [activeTop, setActiveTop] = useState(0)
 	const [totalHeight, setTotalHeight] = useState(0)
-	const [currentPage, setCurrentPage] = useState(0)
+	const [currentPage, setCurrentPage] = useState(1)
 	const [ruler, setRuler] = useState({})
+	const [displayCurrentPage, setDisplayCurrentPage] = useState(0)
+	const [loader, setLoader] = useState(true)
+	const scrolldivRef1 =  useRef() 
+
+
 
 
 	useEffect(() => {
@@ -94,8 +99,7 @@ const PdfViewer = () => {
 			const innerWidth = window.innerWidth - 100
 			let initScale = parseFloat((innerWidth / large_page_width).toFixed(2));
 			setScale(initScale)
-			console.log(scale);
-
+			setLoader(false)
 
 		};
 
@@ -113,25 +117,24 @@ const PdfViewer = () => {
 				return;
 			}
 
-			
+
 			const start = Math.max(0, currentPage - halfPages);
 			const end = Math.min(numPages, start + pagesToShow);
 
-			
+
 			if (currentPage > numPages - halfPages) {
 				const startAdjustment = Math.max(0, numPages - pagesToShow);
 				setActiveElement(pageDetails.slice(startAdjustment, numPages));
 				setActiveTop(((pageDetails[startAdjustment].cumulativeHeight - (gap * startAdjustment)) * scale) + (gap * startAdjustment));
-				console.log(startAdjustment,end,"@@@")
+				console.log(startAdjustment, end, "@@@")
 			} else {
 				setActiveElement(pageDetails.slice(start, end));
 				const top = ((pageDetails[start].cumulativeHeight - (gap * start)) * scale) + (gap * start);
 				setActiveTop(top);
-				console.log(start,end,"@@@")
 			}
-			
+			setDisplayCurrentPage(currentPage)
 
-		}, 300);
+		}, 0);
 
 		return () => {
 			clearTimeout(changetimeout);
@@ -140,28 +143,77 @@ const PdfViewer = () => {
 	}, [pageDetails, scale, currentPage]);
 
 
+	const gotopage = useCallback((pagenumber)=>{
 
+         const currentscrollLocation = pageDetails[pagenumber-1].cumulativeHeight
+	 scrolldivRef1.current.scrollTo({
+		top: currentscrollLocation*scale,
+		behavior: "smooth",
+	      });
 
+	},[pageDetails,scale])
 
+	// useEffect(()=>{
+	// gotopage(pagenumber)
+	// },{pagenumber})
+
+	const handleRotate = useCallback((currentPage  ,position ) => { 
+		const newPageDetails = [...pageDetails];
+		const targetPage = newPageDetails[currentPage-1];
+		
+		if (!targetPage) return;
+	    
+		const oldHeight = targetPage.height;
+		targetPage.rotate = (targetPage.rotate + (90*position)) % 360; 
+		const tempWidth = targetPage.width;
+		targetPage.width = targetPage.height;
+		targetPage.height = tempWidth;
+	    
+		const heightDifference = targetPage.height - oldHeight;
+	    
+		for (let i = currentPage ; i < newPageDetails.length; i++) {
+		    newPageDetails[i].cumulativeHeight += heightDifference;
+		}
+
+		console.log(newPageDetails,"####")
+		setTotalHeight(prev=>prev+heightDifference)
+	    
+		setPageDetails(newPageDetails);
+	    }, [pageDetails]);
 
 	const handleScroll = (e) => {
 
 		if (e.currentTarget) {
 			const scrollTop = e.currentTarget.scrollTop;
-			let accumulatedHeight = 0;
+			console.log(scrollTop,"###")
 
+			let isLastElement = true
 			for (let i = 0; i < pageDetails.length; i++) {
-				const pageHeight = pageDetails[i].height * scale;
-				accumulatedHeight += pageHeight;
+				const pageHeight = ((pageDetails[i].cumulativeHeight - (i * gap)  ) * scale) + (i * gap) ;
+				
 
-				if (scrollTop < accumulatedHeight) {
-					setCurrentPage(i + 1);
+				if (scrollTop < pageHeight) {
+					setCurrentPage(i);
+					isLastElement = false
 					break;
 				}
+				
+			}
+			if(isLastElement){
+				setCurrentPage(numPages);		
 			}
 		}
 	};
 
+	const handleChange = (e) => { 
+		setDisplayCurrentPage(e.target.value)
+
+	 }
+	 const handleKeyDown = (event) => {
+		if (event.key === 'Enter') { 
+		    gotopage(displayCurrentPage); 
+		}
+	    };
 
 
 
@@ -169,14 +221,40 @@ const PdfViewer = () => {
 	return (
 		<>
 			<div
+				style={{
+					height: "50px",
+					borderBottom:"1px solid red",
+				}}>
+
+
+				<div style={{ color: "black " }} className="d-flex gap-2">
+					<input
+						type="number"
+						value={displayCurrentPage}
+						onChange={handleChange}
+						onKeyDown={handleKeyDown}
+						placeholder="Enter a number"
+						className="border-0 rounded no-arrows px-2"
+						style={{
+							width: "50px",
+							outline: "none",
+						}}
+					/>
+					/ {numPages}
+				</div>
+
+				<button onClick = {()=>handleRotate(currentPage,-1)} >Rotte</button>
+
+			</div>
+			<div
 				onScroll={handleScroll}
 				style={{
 					maxWidth: '100vw',
-					height: "93vh",
+					height: 'calc(100vh - 70px)',
 					overflow: "scroll",
-					margin: "10px "
 				}}
 				id='scrollDiv'
+				ref={scrolldivRef1}
 			>
 				<div
 
@@ -187,7 +265,7 @@ const PdfViewer = () => {
 						justifyContent: "center",
 						overflow: "none",
 						// backgroundColor: 'aliceblue',
-						height: `${((totalHeight - (numPages*gap)) * scale)+numPages*gap}px`,
+						height: `${((totalHeight - (numPages * gap)) * scale) + numPages * gap}px`,
 						position: "relative",
 
 					}}>
@@ -205,6 +283,7 @@ const PdfViewer = () => {
 							display: 'grid',
 							gap: `${gap}px 10px`,
 							height: 'fit-content',
+							minHeight: "70vh",
 							position: "absolute",
 							top: `${activeTop}px`,
 
@@ -224,7 +303,7 @@ const PdfViewer = () => {
 										display: 'flex',
 										justifyContent: 'center',
 										alignItems: 'center',
-										border: '1px solid rgba(0, 0, 0, 0.09)',
+										border: '1px solid red',
 										position: 'relative',
 										backgroundColor: 'aliceblue',
 
@@ -262,6 +341,13 @@ const PdfViewer = () => {
 
 
 						}
+						{loader && (
+							<div style={{ position: "absolute", top: "50%", left: " 50%", zIndex: "100", transform: "translate(-50%, -50%)" }}>
+								<div className="spinner-border " role="status" style={{ width: "3rem", height: "3rem", color: "#1ba2a8 " }}>
+									<span className="sr-only"></span>
+								</div>
+							</div>
+						)}
 
 
 

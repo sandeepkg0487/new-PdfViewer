@@ -14,13 +14,11 @@ function App() {
 
   return (
     <>
-    {/* <div
-    style={{
-      height:"50px"
-    }}>
+      
 
-    </div> */}
+
     
+
 
 
         <PdfViewer
@@ -33,10 +31,10 @@ function App() {
           pdf={pdf}
           setPdf={setPdf}
         />
-    
 
-    </>
-  )
+
+      </>
+      )
 }
 
-export default App
+      export default App
