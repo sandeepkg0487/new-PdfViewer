@@ -24,6 +24,8 @@ const PdfViewer = (props) => {
 
 ////////////////// uniquestates  ////////////////
 const scrolldivRef1 = useRef()
+const isLoadingRef = useRef(true);
+
 ///////////////////////////////
 
 	const [pageDetails, setPageDetails] = useState([]);
@@ -282,7 +284,6 @@ const scrolldivRef1 = useRef()
 
 
 	////////////////////////// append canvas //////////////////
-	const isLoadingRef = useRef(true);
 
 	useEffect(() => {
 		const createCanvas = (pageNum, rotation = 0, scaleFactor, pageDetails) => {
