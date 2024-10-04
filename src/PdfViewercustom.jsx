@@ -2,15 +2,30 @@ import * as pdfjs from "pdfjs-dist";
 import "pdfjs-dist/web/pdf_viewer.css";
 import { useCallback } from "react";
 import { useEffect, useRef, useState } from "react";
-// import URI from "./assets/sample12.pdf"
+import URI from "./assets/sample12.pdf"
 
-const URI = 'https://api24.ilovepdf.com/v1/download/lbr3wzz5ynw4zldpq6jgt8t4t06h97tcyncy7m1ylpql633hddrfq24w46h62jslq92fk7vgx65qb0npmflmy00jzmpkznlb5y81n9zq8rxfpAm9bAdr4vsljzmhb1xww9ws4yv5lblfrmcxg3qqn6433AyxntA2wksmc67ld5Awp6p9v8t1'
+// const URI = 'https://api24.ilovepdf.com/v1/download/lbr3wzz5ynw4zldpq6jgt8t4t06h97tcyncy7m1ylpql633hddrfq24w46h62jslq92fk7vgx65qb0npmflmy00jzmpkznlb5y81n9zq8rxfpAm9bAdr4vsljzmhb1xww9ws4yv5lblfrmcxg3qqn6433AyxntA2wksmc67ld5Awp6p9v8t1'
 // pdfjs.GlobalWorkerOptions.workerSrc = new URL("pdfjs-dist/build/pdf.worker.min.mjs", import.meta.url).toString();
 pdfjs.GlobalWorkerOptions.workerSrc = new URL("pdfjs-dist/build/pdf.worker.min.mjs", import.meta.url).toString();
 
 const gap = 5;
+const pdfPageNumber = "secondPdf_"
+const canvasId = 'canvasId_'
+const container  = "container2"
+const selectPdfPage = "selectPdfPage"
 
-const PdfViewer = () => {
+
+const PdfViewer = (props) => {
+
+	const {
+		isunvisitedPage
+
+	} = props
+
+////////////////// uniquestates  ////////////////
+const scrolldivRef1 = useRef()
+///////////////////////////////
+
 	const [pageDetails, setPageDetails] = useState([]);
 	const [currentLoadPage, setCurrentLoadPage] = useState({});
 	const [scale, setScale] = useState(1)
@@ -25,8 +40,9 @@ const PdfViewer = () => {
 	const [ruler, setRuler] = useState({})
 	const [displayCurrentPage, setDisplayCurrentPage] = useState(0)
 	const [loader, setLoader] = useState(true)
-	const scrolldivRef1 =  useRef() 
-
+	
+	const [visitedPages, setVisitedPages] = useState([]);
+	const [fitToScreen, setFitToScreen] = useState(0)
 
 
 
@@ -98,6 +114,7 @@ const PdfViewer = () => {
 
 			const innerWidth = window.innerWidth - 100
 			let initScale = parseFloat((innerWidth / large_page_width).toFixed(2));
+			setFitToScreen(initScale)
 			setScale(initScale)
 			setLoader(false)
 
@@ -126,7 +143,6 @@ const PdfViewer = () => {
 				const startAdjustment = Math.max(0, numPages - pagesToShow);
 				setActiveElement(pageDetails.slice(startAdjustment, numPages));
 				setActiveTop(((pageDetails[startAdjustment].cumulativeHeight - (gap * startAdjustment)) * scale) + (gap * startAdjustment));
-				console.log(startAdjustment, end, "@@@")
 			} else {
 				setActiveElement(pageDetails.slice(start, end));
 				const top = ((pageDetails[start].cumulativeHeight - (gap * start)) * scale) + (gap * start);
@@ -143,87 +159,282 @@ const PdfViewer = () => {
 	}, [pageDetails, scale, currentPage]);
 
 
-	const gotopage = useCallback((pagenumber)=>{
+	const gotopage = useCallback((pagenumber) => {
 
-         const currentscrollLocation = pageDetails[pagenumber-1].cumulativeHeight
-	 scrolldivRef1.current.scrollTo({
-		top: currentscrollLocation*scale,
-		behavior: "smooth",
-	      });
+		const currentscrollLocation = (pageDetails[pagenumber - 1].cumulativeHeight -(pagenumber*gap))*scale +(pagenumber*gap)
+		scrolldivRef1.current.scrollTo({
+			top: currentscrollLocation+15 ,
+			behavior: "smooth",
+		});
 
-	},[pageDetails,scale])
+	}, [pageDetails, scale])
 
-	// useEffect(()=>{
-	// gotopage(pagenumber)
-	// },{pagenumber})
+	/////////////////////// unvisited page ////////////////////////
+	useEffect(() => {
+		if (numPages > 0 && isunvisitedPage) {
+			const initialVisited = new Array(numPages).fill(false);
+			initialVisited[currentPage - 1] = true;
+			setVisitedPages(initialVisited);
+		}
+	}, [numPages]);
 
-	const handleRotate = useCallback((currentPage  ,position ) => { 
+
+	useEffect(() => {
+		if (isunvisitedPage) {
+
+
+			const timer = setTimeout(() => {
+				setVisitedPages((prev) => {
+					const newVisited = [...prev];
+					newVisited[currentPage - 1] = true;
+					return newVisited;
+				})
+
+			}, 1000);
+
+
+			return () => clearTimeout(timer);
+		}
+	}, [currentPage])
+
+	///////////////////////////////////////////////)
+
+	const handleRotate = useCallback((currentPage, position) => {
 		const newPageDetails = [...pageDetails];
-		const targetPage = newPageDetails[currentPage-1];
-		
+		const targetPage = newPageDetails[currentPage - 1];
+
 		if (!targetPage) return;
-	    
+
 		const oldHeight = targetPage.height;
-		targetPage.rotate = (targetPage.rotate + (90*position)) % 360; 
+		targetPage.rotate = (targetPage.rotate + (90 * position)) % 360;
 		const tempWidth = targetPage.width;
 		targetPage.width = targetPage.height;
 		targetPage.height = tempWidth;
-	    
-		const heightDifference = targetPage.height - oldHeight;
-	    
-		for (let i = currentPage ; i < newPageDetails.length; i++) {
-		    newPageDetails[i].cumulativeHeight += heightDifference;
-		}
 
-		console.log(newPageDetails,"####")
-		setTotalHeight(prev=>prev+heightDifference)
-	    
+		const heightDifference = targetPage.height - oldHeight;
+
+		for (let i = currentPage; i < newPageDetails.length; i++) {
+			newPageDetails[i].cumulativeHeight += heightDifference;
+		}
+		const element = document.getElementById(canvasId + (currentPage - 1));
+		if (element) {
+			element.remove();
+		}
+		setTotalHeight(prev => prev + heightDifference)
 		setPageDetails(newPageDetails);
-	    }, [pageDetails]);
+	}, [pageDetails]);
 
 	const handleScroll = (e) => {
-
 		if (e.currentTarget) {
-			const scrollTop = e.currentTarget.scrollTop;
-			console.log(scrollTop,"###")
+			const scrollTop = e.currentTarget.scrollTop+250;
 
 			let isLastElement = true
 			for (let i = 0; i < pageDetails.length; i++) {
-				const pageHeight = ((pageDetails[i].cumulativeHeight - (i * gap)  ) * scale) + (i * gap) ;
-				
+				const pageHeight = ((pageDetails[i].cumulativeHeight - (i * gap)) * scale) + (i * gap);
+
 
 				if (scrollTop < pageHeight) {
 					setCurrentPage(i);
 					isLastElement = false
 					break;
 				}
-				
+
 			}
-			if(isLastElement){
-				setCurrentPage(numPages);		
+			if (isLastElement) {
+				setCurrentPage(numPages);
 			}
+		}
+
+	};
+
+	const handleChange = (e) => {
+		setDisplayCurrentPage(e.target.value)
+
+	}
+	const handleKeyDown = (event) => {
+		if (event.key === 'Enter') {
+			gotopage(displayCurrentPage);
 		}
 	};
 
-	const handleChange = (e) => { 
-		setDisplayCurrentPage(e.target.value)
 
-	 }
-	 const handleKeyDown = (event) => {
-		if (event.key === 'Enter') { 
-		    gotopage(displayCurrentPage); 
+
+	///////////////////////////////////////////////
+	const handleZoom = (status) => { // status : -1 | 1
+		const newScale = scale + (0.1 * status);
+		if (newScale >= 0.5 && newScale <= 3.5) {
+			
+			setActiveElement([])
+			
+			setScale(newScale);
+			if (scrolldivRef1.current) {
+	
+				scrolldivRef1.current.scrollBy({
+					top: 1,
+					behavior: 'smooth',
+				});
+			}
 		}
-	    };
+
+	}
+
+	//////////////////////////////////////////////
 
 
+	////////////////////////// append canvas //////////////////
+	const isLoadingRef = useRef(true);
 
+	useEffect(() => {
+		const createCanvas = (pageNum, rotation = 0, scaleFactor, pageDetails) => {
+			let viewport;
+			let page = pageDetails.page
+			if (!page) {
+				return
+			}
+
+			viewport = page.getViewport({
+				scale: scaleFactor,
+				rotation
+			});
+
+			const canvas = document.createElement("canvas");
+			canvas.width = viewport.width;
+			canvas.height = viewport.height;
+			canvas.id = canvasId + pageDetails._pageIndex;
+
+			const context = canvas.getContext("2d");
+			const renderContext = {
+				canvasContext: context,
+				viewport
+			};
+			return page.render(renderContext).promise.then(() => {
+				return { success: true, pageNumber: page._pageIndex + 1, element: canvas, rotation };
+			});
+
+		};
+		const loadCanvas = async () => {
+			const pdfContainer = document.getElementById(container);
+			const idsWithoutCanvas = [];
+			isLoadingRef.current = true;
+			if (pdfContainer) {
+				const divs = pdfContainer.getElementsByClassName(selectPdfPage);
+				for (const div of divs) {
+					if (!isLoadingRef.current) break;  // Stop if the loading state changes
+
+					const noCanvas = Number(div.id.split("_")[1]);
+					const isActive = document.getElementById(`${pdfPageNumber}${noCanvas}`);
+
+					if (isActive && !isActive.querySelector('canvas')) {
+
+						idsWithoutCanvas.push(noCanvas);
+						const pdSinglePageDetails = pageDetails[noCanvas];
+
+						const canvas = await createCanvas(idsWithoutCanvas._pageIndex, pdSinglePageDetails.rotate, scale, pdSinglePageDetails);
+
+						canvas.element.id = canvasId+noCanvas;
+
+						if (!div.querySelector('canvas')) {
+							div.appendChild(canvas.element);
+						}
+					}
+				}
+			}
+
+		};
+		const loadTimeOut = setTimeout(() => {
+
+			loadCanvas();
+		}, 300)
+
+		return () => {
+			clearTimeout(loadTimeOut)
+			isLoadingRef.current = false;
+		};
+	}, [activeElement])
+
+	//////////////////////////////////////////////////////////
+	//////////////////////// goto location //////////////////////////
+
+	const handleRuler = useCallback((event) => {
+		if (event.altKey) {
+		    if (event.keyCode === 71 && ruler) { // 'G'
+			event.preventDefault();
+	    
+			
+			const scrollPos = ((pageDetails[ruler.pageNumber].cumulativeHeight - (ruler.pageNumber * gap)) * scale) + ruler.top + (ruler.pageNumber * gap);
+	    
+			scrolldivRef1.current.scrollTo({
+			    top: scrollPos - 300,
+			    behavior: 'smooth',
+			});
+		    }
+		    if (event.keyCode  === 81 && ruler) { // 'Q'
+			event.preventDefault();
+			setRuler();
+		    }
+		}
+	    }, [ruler, scale ]);
+
+	    useEffect(() => {
+		window.addEventListener('keydown', handleRuler);
+	    
+		// Cleanup the event listener on component unmount
+		return () => {
+		    window.removeEventListener('keydown', handleRuler);
+		};
+	    }, [handleRuler])
+
+	const [percentage, setPercentage] = useState();
+	const options = [
+		{
+			key: " Fit to screen",
+			value: fitToScreen
+		},
+		{
+			key: " Actual Width",
+			value: 1
+		},
+		{
+
+			key: "100%",
+			value: 1
+		},
+		{
+			key: "150%",
+			value: 1.5
+		}
+		,
+		{
+			key: "200%",
+			value: 2
+		},
+		{
+			key: "250%",
+			value: 2.5
+		},
+		{
+			key: "300%",
+			value: 3
+		},
+		{
+			key: "350%",
+			value: 3.5
+		}
+	];
+
+	const handleChangeselect = (event) => {
+		setPercentage(event.target.value);
+		setScale(event.target.value)
+		setActiveElement([])
+
+	      };	
 
 	return (
 		<>
 			<div
 				style={{
 					height: "50px",
-					borderBottom:"1px solid red",
+					borderBottom: "1px solid red",
 				}}>
 
 
@@ -243,7 +454,22 @@ const PdfViewer = () => {
 					/ {numPages}
 				</div>
 
-				<button onClick = {()=>handleRotate(currentPage,-1)} >Rotte</button>
+				<button onClick={() => handleRotate(currentPage, -1)} >Rotte</button>
+				<button onClick={() => handleZoom(-1)} >zoom out </button>
+				<button onClick={() => handleZoom(1)} >zoom in </button>
+				<select value={percentage} onChange={handleChangeselect}>
+					{options.map((option) => (
+						<option key={option.key} value={option.value}>
+							{option.key}
+						</option>
+					))}
+				</select>
+				<button onClick={()=>{gotopage(1)}}  > goto first</button>
+				<button onClick={()=>{gotopage(currentPage+1)}}  > next</button>
+				<button onClick={()=>{gotopage(currentPage-1)}}  > prev</button>
+				<button onClick={()=>{gotopage(numPages)}}  > goto last</button>
+
+
 
 			</div>
 			<div
@@ -272,10 +498,10 @@ const PdfViewer = () => {
 
 					<div
 
-						id="container2"
+						id={container}
 						className="container"
 						style={{
-							width: '100%',
+							minWidth: '100%',
 							// marginTop: "50px",
 							// transform: `scale(${scale+1})`,
 							transformOrigin: 'center',
@@ -286,6 +512,9 @@ const PdfViewer = () => {
 							minHeight: "70vh",
 							position: "absolute",
 							top: `${activeTop}px`,
+							overflow: "scroll",
+							justifyItems: 'center',
+							backgroundColor: 'cadetblue'
 
 						}}
 					>
@@ -295,7 +524,7 @@ const PdfViewer = () => {
 								<div
 									key={item._pageIndex}
 									// style={styles.container}
-									id={`data-page-number_${item?._pageIndex}`}
+									id={`${pdfPageNumber}${item?._pageIndex}`}
 									data-page-number_="1"
 									style={{
 										width: `${item.width * scale}px`,
@@ -318,8 +547,8 @@ const PdfViewer = () => {
 										setRuler({ pageNumber: item._pageIndex, top: clickY })
 
 									}}
+									className={selectPdfPage}
 								>
-									<h1>{item?._pageIndex}</h1>
 
 									{(item?._pageIndex === ruler.pageNumber) && <div
 										style={{
@@ -329,7 +558,8 @@ const PdfViewer = () => {
 											backgroundColor: "red",
 											top: `${ruler.top}px`
 										}}
-										className="ruler_div"
+										className="ruler_div "
+
 									>
 
 									</div>}
@@ -355,7 +585,7 @@ const PdfViewer = () => {
 					</div>
 				</div>
 
-				
+
 
 			</div>
 		</>

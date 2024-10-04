@@ -30,6 +30,7 @@ function App() {
           setNumPages={setNumPages}
           pdf={pdf}
           setPdf={setPdf}
+          isunvisitedPage={true}
         />
 
 
